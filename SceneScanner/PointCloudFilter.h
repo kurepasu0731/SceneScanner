@@ -4,6 +4,7 @@
 
 //---Filter関係---//
 
+
 //法線ベクトルを求める
 std::vector<cv::Point3f> getNormalVectors(std::vector<cv::Point3f> points)
 {
@@ -67,7 +68,7 @@ std::vector<cv::Point3f> getDownSampledPoints(std::vector<cv::Point3f> points, f
 
 
 //三角メッシュを生成、メッシュ情報を返す
-std::vector<cv::Point3i> getMeshVectors(std::vector<cv::Point3f> points, std::vector<cv::Point3f> normals)
+std::vector<cv::Point3i> getMeshVectors(std::vector<cv::Point3f> points, std::vector<cv::Point3f> normals, pcl::PolygonMesh& triangles)
 {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
@@ -85,7 +86,6 @@ std::vector<cv::Point3i> getMeshVectors(std::vector<cv::Point3f> points, std::ve
 
 	// Initialize objects
 	pcl::GreedyProjectionTriangulation<pcl::PointNormal> gp3;
-	pcl::PolygonMesh triangles;
 
 	// Set the maximum distance between connected points (maximum edge length)
 	gp3.setSearchRadius (0.025);

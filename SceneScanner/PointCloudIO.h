@@ -20,16 +20,6 @@ std::vector<cv::Point3f> loadXMLfile(const std::string &fileName)
 //PLY形式で保存(法線なし)
 void savePLY(std::vector<cv::Point3f> points, const std::string &fileName)
 {
-	//重心を求める
-	double cx = 0, cy = 0, cz = 0;
-	for (int n = 0; n < points.size(); n++){
-		cx += points[n].x;
-		cy += points[n].y;
-		cz += points[n].z;
-	}
-	cx /= points.size();
-	cy /= points.size();
-	cz /= points.size();
 
 	//ファイルオープン
 	FILE *fp;
@@ -41,9 +31,8 @@ void savePLY(std::vector<cv::Point3f> points, const std::string &fileName)
 
 	//3次元点群
 	//m単位で保存（xmlはmm）
-	//重心を原点にする
 	for (int n = 0; n < points.size(); n++){
-	   fprintf(fp, "%f %f %f \n", (points[n].x - cx), (points[n].y - cy), (points[n].z - cz));
+	   fprintf(fp, "%f %f %f \n", points[n].x, points[n].y, points[n].z);
 	}
 	//ファイルクローズ
 	fclose(fp);
@@ -52,17 +41,6 @@ void savePLY(std::vector<cv::Point3f> points, const std::string &fileName)
 //PLY形式で保存(法線あり)
 void savePLY_with_normal(std::vector<cv::Point3f> points, std::vector<cv::Point3f> normals, const std::string &fileName)
 {
-	////重心を求める
-	//double cx = 0, cy = 0, cz = 0;
-	//for (int n = 0; n < points.size(); n++){
-	//	cx += points[n].x;
-	//	cy += points[n].y;
-	//	cz += points[n].z;
-	//}
-	//cx /= points.size();
-	//cy /= points.size();
-	//cz /= points.size();
-
 	//ファイルオープン
 	FILE *fp;
 	fp = fopen(fileName.data(), "w");
@@ -73,9 +51,7 @@ void savePLY_with_normal(std::vector<cv::Point3f> points, std::vector<cv::Point3
 
 	//3次元点群
 	//m単位で保存（xmlはmm）
-	//重心を原点にする
 	for (int n = 0; n < points.size(); n++){
-	   //fprintf(fp, "%f %f %f %f %f %f \n", (points[n].x - cx), (points[n].y - cy), (points[n].z - cz), normals[n].x, normals[n].y, normals[n].z);
 		fprintf(fp, "%f %f %f %f %f %f \n", points[n].x, points[n].y, points[n].z, normals[n].x, normals[n].y, normals[n].z);
 
 	}
@@ -86,17 +62,6 @@ void savePLY_with_normal(std::vector<cv::Point3f> points, std::vector<cv::Point3
 //PLY形式で保存(法線あり,meshあり)
 void savePLY_with_normal_mesh(std::vector<cv::Point3f> points, std::vector<cv::Point3f> normals, std::vector<cv::Point3i> meshes, const std::string &fileName)
 {
-	////重心を求める
-	//double cx = 0, cy = 0, cz = 0;
-	//for (int n = 0; n < points.size(); n++){
-	//	cx += points[n].x;
-	//	cy += points[n].y;
-	//	cz += points[n].z;
-	//}
-	//cx /= points.size();
-	//cy /= points.size();
-	//cz /= points.size();
-
 	//ファイルオープン
 	FILE *fp;
 	fp = fopen(fileName.data(), "w");
@@ -107,9 +72,7 @@ void savePLY_with_normal_mesh(std::vector<cv::Point3f> points, std::vector<cv::P
 
 	//3次元点群
 	//m単位で保存（xmlはmm）
-	//重心を原点にする
 	for (int n = 0; n < points.size(); n++){
-	   //fprintf(fp, "%f %f %f %f %f %f \n", (points[n].x - cx), (points[n].y - cy), (points[n].z - cz), normals[n].x, normals[n].y, normals[n].z);
 	   fprintf(fp, "%f %f %f %f %f %f \n", points[n].x, points[n].y, points[n].z, normals[n].x, normals[n].y, normals[n].z);
 	}
 	//面情報記述
@@ -120,4 +83,35 @@ void savePLY_with_normal_mesh(std::vector<cv::Point3f> points, std::vector<cv::P
 	//ファイルクローズ
 	fclose(fp);
 }
+
+
+//OBJ形式で保存(法線あり,meshあり)
+void saveOBJ_with_normal_mesh(std::vector<cv::Point3f> points, std::vector<cv::Point3f> normals, std::vector<cv::Point3i> meshes, const std::string &fileName)
+{
+	//ファイルオープン
+	FILE *fp;
+	fp = fopen(fileName.data(), "w");
+
+	//ファイルに書き込む
+	//ヘッダの設定
+	fprintf(fp,"o dorascan");
+
+	//3次元点群
+	//m単位で保存（xmlはmm）
+	for (int n = 0; n < points.size(); n++){
+	   fprintf(fp, "v %f %f %f\n", points[n].x, points[n].y, points[n].z);
+	}
+	//法線情報記述
+	for(int n = 0; n < normals.size(); n++){
+		fprintf(fp, "vn %f %f %f\n", normals[n].x, normals[n].y, normals[n].z);
+	}
+	//面情報記述
+	for(int n = 0; n < meshes.size(); n++)
+	{
+	   fprintf(fp, "3 %d %d %d\n", meshes[n].x, meshes[n].y, meshes[n].z);
+	}
+	//ファイルクローズ
+	fclose(fp);
+}
+
 

@@ -13,6 +13,7 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/surface/gp3.h>
+#include <pcl/io/obj_io.h>
 
 #define PROJECTOR_WIDTH 1280
 #define PROJECTOR_HEIGHT 800

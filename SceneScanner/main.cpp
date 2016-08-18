@@ -120,6 +120,7 @@ int main()
 			//2-1. 背景点群(平滑化済)読み込み
 			std::cout << "背景点群の読み込み中…" << std::endl;
 			reconstructPoint_back = loadXMLfile("reconstructPoints_camera.xml");
+			break;
 		}
 		else if(key == '2')
 		{
@@ -128,14 +129,15 @@ int main()
 			std::vector<cv::Point3f> reconstructPoint_back_raw;
 			reconstructPoint_back_raw = scanScene(calib, gc);
 
-			std::cout << "背景を平滑化します…" << std::endl;
+			std::cout << "背景を平滑化します…" << std::ends;
 			//メディアンフィルタによる平滑化
 			calib.smoothReconstructPoints(reconstructPoint_back_raw, reconstructPoint_back, 11); //z<0の点はソート対象外にする？
-
+			std::cout << "完了" << std::endl;
 			//==保存==//
-			cv::FileStorage fs_obj("./reconstructPoints_smoothed.xml", cv::FileStorage::WRITE);
+			cv::FileStorage fs_obj("./reconstructPoints_camera.xml", cv::FileStorage::WRITE);
 			write(fs_obj, "points", reconstructPoint_back);
 			std::cout << "背景を保存しました…" << std::endl;
+			break;
 		}
 		else 
 		{
@@ -175,11 +177,16 @@ int main()
 	//法線を求める
 	std::vector<cv::Point3f> normalVecs = getNormalVectors(validPoints);
 	//メッシュを求める
-	std::vector<cv::Point3i> meshes = getMeshVectors(validPoints, normalVecs);
+	pcl::PolygonMesh triangles;
+	std::vector<cv::Point3i> meshes = getMeshVectors(validPoints, normalVecs, triangles);
+
 
 	//6. PLY形式で保存
 	std::cout << "モデルを保存します…" << std::endl;
 	savePLY_with_normal_mesh(validPoints, normalVecs, meshes, "reconstructPoint_obj.ply");
+	//6. OBJ形式で保存
+	pcl::io::saveOBJFile("reconstructPoint_obj.obj", triangles);
+
 	std::cout << "モデルを保存しました…\n終了するには何かキーを押してください" << std::endl;
 
 	cv::waitKey(0);
