@@ -185,7 +185,7 @@ int main()
 	std::cout << "モデルを保存します…" << std::endl;
 	savePLY_with_normal_mesh(validPoints, normalVecs, meshes, "reconstructPoint_obj.ply");
 	//6. OBJ形式で保存
-	pcl::io::saveOBJFile("reconstructPoint_obj.obj", triangles);
+	pcl::io::saveOBJFile("reconstructPoint_obj.obj", triangles); //->Unity上にはRotate(0, 0, 180)で配置
 
 	std::cout << "モデルを保存しました…\n終了するには何かキーを押してください" << std::endl;
 
