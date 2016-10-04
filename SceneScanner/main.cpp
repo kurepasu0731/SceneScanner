@@ -53,6 +53,93 @@ std::vector<cv::Point3f> scanScene(Calibration calib, GRAYCODE gc)
 	return reconstructPoint;
 }
 
+// オイラー角を行列に変換
+void eular2rot(double yaw,double pitch, double roll, cv::Mat& dest)
+{
+    double theta = yaw/180.0*CV_PI;
+    double pusai = pitch/180.0*CV_PI;
+    double phi = roll/180.0*CV_PI;
+ 
+    double datax[3][3] = {{1.0,0.0,0.0}, 
+    {0.0,cos(theta),-sin(theta)}, 
+    {0.0,sin(theta),cos(theta)}};
+    double datay[3][3] = {{cos(pusai),0.0,sin(pusai)}, 
+    {0.0,1.0,0.0}, 
+    {-sin(pusai),0.0,cos(pusai)}};
+    double dataz[3][3] = {{cos(phi),-sin(phi),0.0}, 
+    {sin(phi),cos(phi),0.0}, 
+    {0.0,0.0,1.0}};
+
+    cv::Mat Rx(3,3,CV_64F,datax);
+    cv::Mat Ry(3,3,CV_64F,datay);
+    cv::Mat Rz(3,3,CV_64F,dataz);
+    cv::Mat rr=Rz*Rx*Ry;
+
+    rr.copyTo(dest);
+}
+
+//点群確認
+void viewPoints(Calibration calib, const cv::Mat &cam, const std::vector<cv::Point3f> &points)
+{
+			// 描画
+			cv::Mat R = cv::Mat::eye(3,3,CV_64F);
+			cv::Mat t = cv::Mat::zeros(3,1,CV_64F);
+			int key=0;
+			cv::Point3d viewpoint(0.0,0.0,400.0);		// 視点位置
+			cv::Point3d lookatpoint(0.0,0.0,0.0);	// 視線方向
+			const double step = 50;
+
+			// キーボード操作
+			while(true)
+			{
+				//// 回転の更新
+				double x=(lookatpoint.x-viewpoint.x);
+				double y=(lookatpoint.y-viewpoint.y);
+				double z=(lookatpoint.z-viewpoint.z);
+				double pitch =asin(x/sqrt(x*x+z*z))/CV_PI*180.0;
+				double yaw   =asin(-y/sqrt(y*y+z*z))/CV_PI*180.0;
+				eular2rot(yaw, pitch, 0, R);
+				// 移動の更新
+				t.at<double>(0,0)=viewpoint.x;
+				t.at<double>(1,0)=viewpoint.y;
+				t.at<double>(2,0)=viewpoint.z;
+
+				//カメラ画素→3次元点
+				calib.pointCloudRender(points, cam, std::string("viewer"), R, t);
+
+				key = cv::waitKey(0);
+				if(key=='w')
+				{
+					viewpoint.y+=step;
+				}
+				if(key=='s')
+				{
+					viewpoint.y-=step;
+				}
+				if(key=='a')
+				{
+					viewpoint.x+=step;
+				}
+				if(key=='d')
+				{
+					viewpoint.x-=step;
+				}
+				if(key=='z')
+				{
+					viewpoint.z+=step;
+				}
+				if(key=='x')
+				{
+					viewpoint.z-=step;
+				}
+				if(key=='q')
+				{
+					break;
+				}
+			}
+}
+
+
 int main()
 {
 	WebCamera webcamera(CAMERA_WIDTH, CAMERA_HEIGHT, "WebCamera");
@@ -120,6 +207,10 @@ int main()
 			//2-1. 背景点群(平滑化済)読み込み
 			std::cout << "背景点群の読み込み中…" << std::endl;
 			reconstructPoint_back = loadXMLfile("reconstructPoints_camera.xml");
+
+			//確認
+			viewPoints(calib, cam2, reconstructPoint_back);
+
 			break;
 		}
 		else if(key == '2')
@@ -137,6 +228,10 @@ int main()
 			cv::FileStorage fs_obj("./reconstructPoints_camera.xml", cv::FileStorage::WRITE);
 			write(fs_obj, "points", reconstructPoint_back);
 			std::cout << "背景を保存しました…" << std::endl;
+
+			//確認
+			viewPoints(calib, cam2, reconstructPoint_back);
+
 			break;
 		}
 		else 
