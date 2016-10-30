@@ -111,7 +111,7 @@ void showViewer(PointCloudT::Ptr cloud_in, PointCloudT::Ptr cloud_icp)
   pcl::visualization::PCLVisualizer viewer ("ICP demo");
   // Create two verticaly separated viewports
   int v1 (0);
-  viewer.createViewPort (0.0, 0.0, 0.5, 1.0, v1);
+  viewer.createViewPort (0.0, 0.0, 1.0, 1.0, v1);
 
   // Original point cloud is white
   pcl::visualization::PointCloudColorHandlerCustom<PointT> cloud_in_color_h (cloud_in, 255, 255, 255);
@@ -132,8 +132,6 @@ void showViewer(PointCloudT::Ptr cloud_in, PointCloudT::Ptr cloud_icp)
   while (!viewer.wasStopped ())
   {
     viewer.spinOnce ();
-
-	if(cv::waitKey(30) == 10) break; //enter
   }
 
 }
@@ -163,10 +161,30 @@ int detectPosition(std::string src_file, std::string model_file)
   }
   std::cout << "\nLoaded file " << model_file << " (" << cloud_icp->size () << " points)" << std::endl;
 
+  //シーン点群ダウンサンプリング
+  float size = 0.005;//5mm
+  PointCloudT::Ptr cloud_in_sampled (new PointCloudT);  // ICP output point cloud
+  // Create the filtering object
+  pcl::VoxelGrid<PointT> sor;
+  sor.setInputCloud (cloud_in);
+  sor.setLeafSize (size, size, size);
+  sor.filter (*cloud_in_sampled);
+  std::cout << "\nDown sampled " << src_file << " (" << cloud_in_sampled->size () << " points)" << std::endl;
+  //モデル点群ダウンサンプリング
+  PointCloudT::Ptr cloud_icp_sampled (new PointCloudT);  // ICP output point cloud
+  // Create the filtering object
+  pcl::VoxelGrid<PointT> sor_;
+  sor_.setInputCloud (cloud_icp);
+  sor_.setLeafSize (size, size, size);
+  sor_.filter (*cloud_icp_sampled);
+  std::cout << "\nDown sampled " << model_file << " (" << cloud_icp_sampled->size () << " points)" << std::endl;
+
+
   //点群セット&icp
   pcl::IterativeClosestPoint<PointT, PointT> icp;
-  icp.setInputSource (cloud_icp);
-  icp.setInputTarget (cloud_in);
+  //icp.setMaximumIterations(100);
+  icp.setInputSource (cloud_icp_sampled);
+  icp.setInputTarget (cloud_in_sampled);
   icp.align (*cloud_icp);
   if (icp.hasConverged ())
   {
@@ -175,7 +193,7 @@ int detectPosition(std::string src_file, std::string model_file)
     print4x4Matrix (transformation_matrix);
 	save4x4MatricCSV(transformation_matrix);
 	//viewer
-	showViewer(cloud_in, cloud_icp);
+	showViewer(cloud_in_sampled, cloud_icp_sampled);
   }
   else
   {
@@ -392,9 +410,9 @@ int main()
 	std::cout << "モデルを保存しました…" << std::endl;
 
 
-	//7. ICPで位置検出
-	std::cout << "ICPにより位置を検出します…" << std::endl;
-	int result = detectPosition("reconstructPoint_obj.ply", "doraemon.ply");
+	////7. ICPで位置検出(できない。。)
+	//std::cout << "ICPにより位置を検出します…" << std::endl;
+	//int result = detectPosition("reconstructPoint_obj.ply", "dora_small.ply");
 
 
 	std::cout << "終了するには何かキーを押してください" << std::endl;
