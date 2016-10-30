@@ -7,6 +7,9 @@
 #include <Windows.h>
 #include <opencv2\opencv.hpp>
 #include <math.h>
+#include<iostream> //入出力ライブラリ
+#include<fstream> //iostreamのファイル入出力をサポート
+
 
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
@@ -14,6 +17,10 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/surface/gp3.h>
 #include <pcl/io/obj_io.h>
+
+#include <pcl/io/ply_io.h>
+#include <pcl/registration/icp.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 #define PROJECTOR_WIDTH 1280
 #define PROJECTOR_HEIGHT 800

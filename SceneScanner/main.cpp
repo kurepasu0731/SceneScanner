@@ -4,6 +4,8 @@
 #include "PointCloudIO.h"
 #include "PointCloudFilter.h"
 
+
+
 #define MASK_ADDRESS "./GrayCodeImage/mask.bmp"
 #define IMAGE_DIRECTORY "./UseImage"
 #define SAVE_DIRECTORY "./UseImage/resize"
@@ -78,6 +80,113 @@ void eular2rot(double yaw,double pitch, double roll, cv::Mat& dest)
     rr.copyTo(dest);
 }
 
+//変換行列の出力
+void print4x4Matrix (const Eigen::Matrix4d & matrix)
+{
+  printf ("Rotation matrix :\n");
+  printf ("    | %6.3f %6.3f %6.3f | \n", matrix (0, 0), matrix (0, 1), matrix (0, 2));
+  printf ("R = | %6.3f %6.3f %6.3f | \n", matrix (1, 0), matrix (1, 1), matrix (1, 2));
+  printf ("    | %6.3f %6.3f %6.3f | \n", matrix (2, 0), matrix (2, 1), matrix (2, 2));
+  printf ("Translation vector :\n");
+  printf ("t = < %6.3f, %6.3f, %6.3f >\n\n", matrix (0, 3), matrix (1, 3), matrix (2, 3));
+}
+
+//変換行列をcsvで保存(1行目にT,2行目にR)
+void save4x4MatricCSV(const Eigen::Matrix4d & matrix)
+{
+    ofstream ofs("ICPresult.csv"); //ファイル出力ストリーム
+    ofs<< matrix (0, 3) << "," << matrix (1, 3) << "," << matrix (2, 3)<<endl; //T
+    ofs<< matrix (0, 0) << "," << matrix (0, 1) << "," << matrix (0, 2) << 
+			  matrix (1, 0) << "," << matrix (1, 1) << "," << matrix (1, 2) <<
+			  matrix (2, 0) << "," << matrix (2, 1) << "," << matrix (2, 2)  << endl;//R(1行目→2行目→3行目)
+}
+
+
+typedef pcl::PointXYZ PointT;
+typedef pcl::PointCloud<PointT> PointCloudT;
+//点群の可視化
+void showViewer(PointCloudT::Ptr cloud_in, PointCloudT::Ptr cloud_icp)
+{
+  // Visualization
+  pcl::visualization::PCLVisualizer viewer ("ICP demo");
+  // Create two verticaly separated viewports
+  int v1 (0);
+  viewer.createViewPort (0.0, 0.0, 0.5, 1.0, v1);
+
+  // Original point cloud is white
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> cloud_in_color_h (cloud_in, 255, 255, 255);
+  viewer.addPointCloud (cloud_in, cloud_in_color_h, "cloud_in", v1);
+
+  // ICP aligned point cloud is red
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> cloud_icp_color_h (cloud_icp, 180, 20, 20);
+  viewer.addPointCloud (cloud_icp, cloud_icp_color_h, "cloud_icp", v1);
+
+  // Set background color
+  viewer.setBackgroundColor (0, 0, 0, v1);
+
+  // Set camera position and orientation
+  viewer.setCameraPosition (-3.68332, 2.94092, 5.71266, 0.289847, 0.921947, -0.256907, 0);
+  viewer.setSize (1280, 1024);  // Visualiser window size
+
+  // Display the visualiser
+  while (!viewer.wasStopped ())
+  {
+    viewer.spinOnce ();
+
+	if(cv::waitKey(30) == 10) break; //enter
+  }
+
+}
+
+
+//ICPによる位置検出
+int detectPosition(std::string src_file, std::string model_file)
+{
+  // The point clouds we will be using
+  PointCloudT::Ptr cloud_in (new PointCloudT);  // Original point cloud
+  PointCloudT::Ptr cloud_icp (new PointCloudT);  // ICP output point cloud
+
+  // Defining a rotation matrix and translation vector
+  Eigen::Matrix4d transformation_matrix = Eigen::Matrix4d::Identity ();
+
+  //シーン点群とモデル点群の読み込み
+  if (pcl::io::loadPLYFile (src_file, *cloud_in) < 0)
+  {
+    PCL_ERROR ("Error loading cloud %s.\n", src_file);
+    return (-1);
+  }
+  std::cout << "\nLoaded file " << src_file << " (" << cloud_in->size () << " points)" << std::endl;
+  if (pcl::io::loadPLYFile (model_file, *cloud_icp) < 0)
+  {
+    PCL_ERROR ("Error loading cloud %s.\n", model_file);
+    return (-1);
+  }
+  std::cout << "\nLoaded file " << model_file << " (" << cloud_icp->size () << " points)" << std::endl;
+
+  //点群セット&icp
+  pcl::IterativeClosestPoint<PointT, PointT> icp;
+  icp.setInputSource (cloud_icp);
+  icp.setInputTarget (cloud_in);
+  icp.align (*cloud_icp);
+  if (icp.hasConverged ())
+  {
+    std::cout << "\nICP has converged, score is " << icp.getFitnessScore () << std::endl;
+    transformation_matrix = icp.getFinalTransformation ().cast<double>();
+    print4x4Matrix (transformation_matrix);
+	save4x4MatricCSV(transformation_matrix);
+	//viewer
+	showViewer(cloud_in, cloud_icp);
+  }
+  else
+  {
+    PCL_ERROR ("\nICP has not converged.\n");
+    return (-1);
+  }
+
+ return (0);
+
+}
+
 //点群確認
 void viewPoints(Calibration calib, const cv::Mat &cam, const std::vector<cv::Point3f> &points)
 {
@@ -138,7 +247,6 @@ void viewPoints(Calibration calib, const cv::Mat &cam, const std::vector<cv::Poi
 				}
 			}
 }
-
 
 int main()
 {
@@ -281,8 +389,15 @@ int main()
 	savePLY_with_normal_mesh(validPoints, normalVecs, meshes, "reconstructPoint_obj.ply");
 	//6. OBJ形式で保存
 	pcl::io::saveOBJFile("reconstructPoint_obj.obj", triangles); //->Unity上にはRotate(0, 0, 180)で配置
+	std::cout << "モデルを保存しました…" << std::endl;
 
-	std::cout << "モデルを保存しました…\n終了するには何かキーを押してください" << std::endl;
+
+	//7. ICPで位置検出
+	std::cout << "ICPにより位置を検出します…" << std::endl;
+	int result = detectPosition("reconstructPoint_obj.ply", "doraemon.ply");
+
+
+	std::cout << "終了するには何かキーを押してください" << std::endl;
 
 	cv::waitKey(0);
 	return 0;
