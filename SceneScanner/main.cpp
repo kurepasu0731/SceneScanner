@@ -3,7 +3,7 @@
 #include "Calibration.h"
 #include "PointCloudIO.h"
 #include "PointCloudFilter.h"
-
+#include "FeatureCloud.h"
 
 
 #define MASK_ADDRESS "./GrayCodeImage/mask.bmp"
@@ -136,6 +136,72 @@ void showViewer(PointCloudT::Ptr cloud_in, PointCloudT::Ptr cloud_icp)
 
 }
 
+//初期位置合わせ
+void initialEstimation(PointCloudT::Ptr cloud_in, PointCloudT::Ptr cloud_icp, std::string model_filename)
+{
+
+  // Load the object templates specified in the object_templates.txt file
+  std::vector<FeatureCloud> object_templates;
+  object_templates.resize (0); 
+  FeatureCloud template_cloud;
+  template_cloud.loadInputCloud (model_filename);
+  object_templates.push_back (template_cloud);
+
+  // Preprocess the cloud by...
+  // ...removing distant points
+  const float depth_limit = 1.0;
+  pcl::PassThrough<PointT> pass;
+  pass.setInputCloud (cloud_in);
+  pass.setFilterFieldName ("z");
+  pass.setFilterLimits (0, depth_limit);
+  pass.filter (*cloud_in);
+
+  // ... and downsampling the point cloud
+  const float voxel_grid_size = 0.005f;
+  pcl::VoxelGrid<PointT> vox_grid;
+  vox_grid.setInputCloud (cloud_in);
+  vox_grid.setLeafSize (voxel_grid_size, voxel_grid_size, voxel_grid_size);
+  //vox_grid.filter (*cloud_in); // Please see this http://www.pcl-developers.org/Possible-problem-in-new-VoxelGrid-implementation-from-PCL-1-5-0-td5490361.html
+  pcl::PointCloud<PointT>::Ptr tempCloud (new pcl::PointCloud<PointT>); 
+  vox_grid.filter (*tempCloud);
+  cloud_in = tempCloud; 
+
+  // Assign to the target FeatureCloud
+  FeatureCloud target_cloud;
+  target_cloud.setInputCloud (cloud_in);
+
+  // Set the TemplateAlignment inputs
+  TemplateAlignment template_align;
+  for (size_t i = 0; i < object_templates.size (); ++i)
+  {
+    template_align.addTemplateCloud (object_templates[i]);
+  }
+  template_align.setTargetCloud (target_cloud);
+
+  // Find the best template alignment
+  TemplateAlignment::Result best_alignment;
+  int best_index = template_align.findBestAlignment (best_alignment);
+  const FeatureCloud &best_template = object_templates[best_index];
+
+  // Print the alignment fitness score (values less than 0.00002 are good)
+  printf ("Best fitness score: %f\n", best_alignment.fitness_score);
+
+  // Print the rotation matrix and translation vector
+  Eigen::Matrix3f rotation = best_alignment.final_transformation.block<3,3>(0, 0);
+  Eigen::Vector3f translation = best_alignment.final_transformation.block<3,1>(0, 3);
+
+  printf ("\n");
+  printf ("    | %6.3f %6.3f %6.3f | \n", rotation (0,0), rotation (0,1), rotation (0,2));
+  printf ("R = | %6.3f %6.3f %6.3f | \n", rotation (1,0), rotation (1,1), rotation (1,2));
+  printf ("    | %6.3f %6.3f %6.3f | \n", rotation (2,0), rotation (2,1), rotation (2,2));
+  printf ("\n");
+  printf ("t = < %0.3f, %0.3f, %0.3f >\n", translation (0), translation (1), translation (2));
+
+  //model点群を初期位置へ移動
+  PointCloudT::Ptr cloud_icp_trans (new PointCloudT);  // Original point cloud
+  pcl::transformPointCloud(*cloud_icp, *cloud_icp_trans, best_alignment.final_transformation);
+  cloud_icp = cloud_icp_trans;
+}
 
 //ICPによる位置検出
 int detectPosition(std::string src_file, std::string model_file)
@@ -161,30 +227,32 @@ int detectPosition(std::string src_file, std::string model_file)
   }
   std::cout << "\nLoaded file " << model_file << " (" << cloud_icp->size () << " points)" << std::endl;
 
-  //シーン点群ダウンサンプリング
-  float size = 0.005;//5mm
-  PointCloudT::Ptr cloud_in_sampled (new PointCloudT);  // ICP output point cloud
-  // Create the filtering object
-  pcl::VoxelGrid<PointT> sor;
-  sor.setInputCloud (cloud_in);
-  sor.setLeafSize (size, size, size);
-  sor.filter (*cloud_in_sampled);
-  std::cout << "\nDown sampled " << src_file << " (" << cloud_in_sampled->size () << " points)" << std::endl;
-  //モデル点群ダウンサンプリング
-  PointCloudT::Ptr cloud_icp_sampled (new PointCloudT);  // ICP output point cloud
-  // Create the filtering object
-  pcl::VoxelGrid<PointT> sor_;
-  sor_.setInputCloud (cloud_icp);
-  sor_.setLeafSize (size, size, size);
-  sor_.filter (*cloud_icp_sampled);
-  std::cout << "\nDown sampled " << model_file << " (" << cloud_icp_sampled->size () << " points)" << std::endl;
+  ////シーン点群ダウンサンプリング
+  //float size = 0.005;//5mm
+  //PointCloudT::Ptr cloud_in_sampled (new PointCloudT);  // ICP output point cloud
+  //// Create the filtering object
+  //pcl::VoxelGrid<PointT> sor;
+  //sor.setInputCloud (cloud_in);
+  //sor.setLeafSize (size, size, size);
+  //sor.filter (*cloud_in_sampled);
+  //std::cout << "\nDown sampled " << src_file << " (" << cloud_in_sampled->size () << " points)" << std::endl;
+  ////モデル点群ダウンサンプリング
+  //PointCloudT::Ptr cloud_icp_sampled (new PointCloudT);  // ICP output point cloud
+  //// Create the filtering object
+  //pcl::VoxelGrid<PointT> sor_;
+  //sor_.setInputCloud (cloud_icp);
+  //sor_.setLeafSize (size, size, size);
+  //sor_.filter (*cloud_icp_sampled);
+  //std::cout << "\nDown sampled " << model_file << " (" << cloud_icp_sampled->size () << " points)" << std::endl;
 
+  //初期位置合わせ
+  initialEstimation(cloud_in, cloud_icp, model_file);
 
   //点群セット&icp
   pcl::IterativeClosestPoint<PointT, PointT> icp;
   //icp.setMaximumIterations(100);
-  icp.setInputSource (cloud_icp_sampled);
-  icp.setInputTarget (cloud_in_sampled);
+  icp.setInputSource (cloud_icp);
+  icp.setInputTarget (cloud_in);
   icp.align (*cloud_icp);
   if (icp.hasConverged ())
   {
@@ -193,7 +261,7 @@ int detectPosition(std::string src_file, std::string model_file)
     print4x4Matrix (transformation_matrix);
 	save4x4MatricCSV(transformation_matrix);
 	//viewer
-	showViewer(cloud_in_sampled, cloud_icp_sampled);
+	showViewer(cloud_in, cloud_icp);
   }
   else
   {
@@ -410,7 +478,7 @@ int main()
 	std::cout << "モデルを保存しました…" << std::endl;
 
 
-	////7. ICPで位置検出(できない。。)
+	//7. ICPで位置検出(できない。。)
 	//std::cout << "ICPにより位置を検出します…" << std::endl;
 	//int result = detectPosition("reconstructPoint_obj.ply", "dora_small.ply");
 

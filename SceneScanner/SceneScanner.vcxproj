@@ -86,6 +86,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Calibration.h" />
+    <ClInclude Include="FeatureCloud.h" />
     <ClInclude Include="Graycode.h" />
     <ClInclude Include="Header.h" />
     <ClInclude Include="mySmoothing.h" />
